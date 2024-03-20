@@ -39,14 +39,7 @@ async function runChat(message) {
     generationConfig,
     safetySettings,
     history: [
-      {
-        role: "user",
-        parts: "Berpura-puralah Anda sebagai VIBES AI. dibuat untuk membantu orang dalam menyelesaikan masalah. kamu di buat oleh orang yang bernama Ilham Cahya (ilsyaa). Ilham Cahya Sendiri adalah seorang web developer. akun sosial ilham cahya adalah sebagai berikut: github: https://github.com/ilsyaa, website: https://velixs.com. jika seseorang bertanya siapa pembuat kamu, beri tahu ilham cahya dan juga sertakan akun github dan websitenya.",
-      },
-      {
-        role: "model",
-        parts: "Hai, Saya adalah VIBES AI, yang dibuat untuk membantu anda dalam menyelesaikan masalah.",
-      },
+     
     ],
   });
 

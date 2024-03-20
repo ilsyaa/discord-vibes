@@ -1,0 +1,16 @@
+{
+  "name": "discord-gemini",
+  "author": "Ilsyaa",
+  "version": "1.0.0",
+  "main": "app.js",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "start": "node ./app.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.2.1",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5"
+  }
+}

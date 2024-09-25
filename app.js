@@ -1,7 +1,7 @@
+import 'dotenv/config';
 import { ActivityType, Client, Events, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior } from '@discordjs/voice';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, AudioPlayerStatus } from '@discordjs/voice';
 import play from 'play-dl';
-import { DISCORD_BOT_TOKEN, CLIENT_ID } from './config.js';
 
 const client = new Client({
   presence: {
@@ -21,7 +21,7 @@ const client = new Client({
   ]
 });
 
-const rest = new REST({ version: '10' }).setToken(DISCORD_BOT_TOKEN);
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
 
 // Definisi perintah slash
 const commands = [
@@ -39,7 +39,7 @@ async function registerCommands() {
   try {
     console.log('Mulai mendaftarkan perintah aplikasi (/).');
     await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
+      Routes.applicationCommands(process.env.CLIENT_ID),
       { body: commands },
     );
     console.log('Berhasil mendaftarkan perintah aplikasi (/).');
@@ -59,6 +59,11 @@ client.on(Events.InteractionCreate, async interaction => {
   const { commandName } = interaction;
 
   if (commandName === 'play') {
+    const permissions = interaction.member.voice.channel.permissionsFor(interaction.guild.members.me);
+    if (!permissions.has(['Connect', 'Speak'])) {
+      return interaction.reply('Bot tidak memiliki izin untuk bergabung atau berbicara di voice channel.');
+    }
+
     if (!interaction.member.voice.channel) {
       return interaction.reply('Anda harus berada di voice channel untuk memutar musik!');
     }
@@ -68,33 +73,43 @@ client.on(Events.InteractionCreate, async interaction => {
     await interaction.deferReply();
 
     try {
+      const player = createAudioPlayer({});
+      player.on(AudioPlayerStatus.Buffering, () => {
+        console.log('Audio player sedang buffering');
+      });
+      player.on(AudioPlayerStatus.Idle, () => {
+        console.log('Audio player dalam keadaan idle');
+      });
+      player.on(AudioPlayerStatus.AutoPaused, () => {
+        console.log('Audio player auto-paused');
+      });
+      player.on(AudioPlayerStatus.Playing, () => {
+        console.log('Audio player sedang diputar');
+      });
+      player.on(AudioPlayerStatus.Paused, () => {
+        console.log('Audio player sedang berhenti');
+      });
+
       const ytInfo = await play.search(query, { limit: 1 });
       if (!ytInfo || ytInfo.length === 0) {
         return interaction.editReply('Tidak dapat menemukan lagu tersebut.');
       }
-
-      const stream = await play.stream(ytInfo[0].url);
-      const resource = createAudioResource(stream.stream, {
-        inputType: stream.type
-      });
-
-      const player = createAudioPlayer({
-        behaviors: {
-          noSubscriber: NoSubscriberBehavior.Pause,
-        },
-      });
 
       const connection = joinVoiceChannel({
         channelId: interaction.member.voice.channel.id,
         guildId: interaction.guild.id,
         adapterCreator: interaction.guild.voiceAdapterCreator,
       });
-
-      player.play(resource);
       connection.subscribe(player);
 
-      await interaction.editReply(`Mulai memutar: ${ytInfo[0].title}`);
+      const stream = await play.stream(ytInfo[0].url);
+      // const resource = createAudioResource('./cat.mp3')
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type
+      });
+      player.play(resource);
 
+      await interaction.editReply(`Mulai memutar: ${ytInfo[0]?.title || 'lagu'}`);
     } catch (error) {
       console.error(error);
       await interaction.editReply('Terjadi kesalahan saat mencoba memutar musik.');
@@ -107,4 +122,4 @@ client.on(Events.MessageCreate, async message => {
   // Tambahkan logika tambahan di sini jika diperlukan
 });
 
-client.login(DISCORD_BOT_TOKEN);
+client.login(process.env.DISCORD_BOT_TOKEN);

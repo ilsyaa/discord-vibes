@@ -9,8 +9,10 @@
     "start": "node ./app.js"
   },
   "dependencies": {
+    "@discordjs/voice": "^0.17.0",
     "@google/generative-ai": "^0.2.1",
     "discord.js": "^14.14.1",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "play-dl": "^1.9.7"
   }
 }

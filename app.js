@@ -1,57 +1,7 @@
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
-import { ActivityType, Client, Events, GatewayIntentBits } from 'discord.js';
-import { API_KEY_GEMINI, DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID } from './config.js';
-
-
-const MODEL_NAME = "gemini-pro";
-
-async function runChat(message) {
-  const genAI = new GoogleGenerativeAI(API_KEY_GEMINI);
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-
-  const generationConfig = {
-    temperature: 0.9,
-    topK: 1,
-    topP: 1,
-    maxOutputTokens: 2048,
-  };
-
-  const safetySettings = [
-    {
-      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-    },
-  ];
-
-  const chat = model.startChat({
-    generationConfig,
-    safetySettings,
-    history: [
-     
-    ],
-  });
-
-  const result = await chat.sendMessage(message);
-
-  if (result.response.promptFeedback.blockReason) {
-    return "Tolong tanyakan sesuatu yang lebih normal!"
-  }
-  const response = result.response;
-
-  return response.text()
-}
+import { ActivityType, Client, Events, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior } from '@discordjs/voice';
+import play from 'play-dl';
+import { DISCORD_BOT_TOKEN, CLIENT_ID } from './config.js';
 
 const client = new Client({
   presence: {
@@ -62,51 +12,99 @@ const client = new Client({
       type: ActivityType.Custom
     }],
   },
-  intents: [GatewayIntentBits.Guilds,
-  GatewayIntentBits.GuildMessages,
-  GatewayIntentBits.MessageContent,
-  GatewayIntentBits.GuildMembers,]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates,
+  ]
 });
 
+const rest = new REST({ version: '10' }).setToken(DISCORD_BOT_TOKEN);
 
-async function sendInChunks(message, channel, limit = 2000) {
-  if (message.length <= limit) {
-    await channel.reply(message);
-    return;
-  }
+// Definisi perintah slash
+const commands = [
+  new SlashCommandBuilder()
+    .setName('play')
+    .setDescription('Memutar lagu dari YouTube')
+    .addStringOption(option =>
+      option.setName('query')
+        .setDescription('URL YouTube atau judul lagu')
+        .setRequired(true)),
+];
 
-  let parts = [];
-  let currentPart = '';
-
-  message.split(' ').forEach(word => {
-    if (currentPart.length + word.length + 1 > limit) {
-      parts.push(currentPart);
-      currentPart = '';
-    }
-    currentPart += `${word} `;
-  });
-
-  if (currentPart.length) {
-    parts.push(currentPart.trim());
-  }
-
-  for (const part of parts) {
-    await channel.reply(part);
+// Fungsi untuk mendaftarkan perintah slash
+async function registerCommands() {
+  try {
+    console.log('Mulai mendaftarkan perintah aplikasi (/).');
+    await rest.put(
+      Routes.applicationCommands(CLIENT_ID),
+      { body: commands },
+    );
+    console.log('Berhasil mendaftarkan perintah aplikasi (/).');
+  } catch (error) {
+    console.error(error);
   }
 }
 
 client.once(Events.ClientReady, readyClient => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+  registerCommands();
 });
 
-client.on('messageCreate', async message => {
-  if (message.author.bot || !message.content) return;
-  if (!message.content.startsWith('ai ')) return;
-  if (message.content && message.channelId === DISCORD_CHANNEL_ID) {
-    await runChat(message.content).then(response => {
-      sendInChunks(response, message);
-    })
+client.on(Events.InteractionCreate, async interaction => {
+  if (!interaction.isCommand()) return;
+
+  const { commandName } = interaction;
+
+  if (commandName === 'play') {
+    if (!interaction.member.voice.channel) {
+      return interaction.reply('Anda harus berada di voice channel untuk memutar musik!');
+    }
+
+    const query = interaction.options.getString('query');
+
+    await interaction.deferReply();
+
+    try {
+      const ytInfo = await play.search(query, { limit: 1 });
+      if (!ytInfo || ytInfo.length === 0) {
+        return interaction.editReply('Tidak dapat menemukan lagu tersebut.');
+      }
+
+      const stream = await play.stream(ytInfo[0].url);
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type
+      });
+
+      const player = createAudioPlayer({
+        behaviors: {
+          noSubscriber: NoSubscriberBehavior.Pause,
+        },
+      });
+
+      const connection = joinVoiceChannel({
+        channelId: interaction.member.voice.channel.id,
+        guildId: interaction.guild.id,
+        adapterCreator: interaction.guild.voiceAdapterCreator,
+      });
+
+      player.play(resource);
+      connection.subscribe(player);
+
+      await interaction.editReply(`Mulai memutar: ${ytInfo[0].title}`);
+
+    } catch (error) {
+      console.error(error);
+      await interaction.editReply('Terjadi kesalahan saat mencoba memutar musik.');
+    }
   }
+});
+
+client.on(Events.MessageCreate, async message => {
+  if (message.author.bot || !message.content) return;
+  // Tambahkan logika tambahan di sini jika diperlukan
 });
 
 client.login(DISCORD_BOT_TOKEN);

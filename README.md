@@ -1,5 +1,5 @@
-### Tentang Discord-Gemini
-Discord-Gemini adalah sebuat script discord bot yang di integrasi dengan gemini ai.
+### Tentang Discord-Vibes
+Bot discord untuk menjadi babu di server vibes
 
 ### Pemasangan
 ```bash 
@@ -12,6 +12,3 @@ Settings di file `.env`
 ```bash
 node app.js
 ```
-
-### Penggunaan
-Ketikan `ai` di awal pesan. Lalu ketik sesuatu yang ingin ditanyakan. contoh `ai question`

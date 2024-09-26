@@ -1,5 +1,4 @@
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, AudioPlayerStatus } from '@discordjs/voice';
-import fs from 'fs';
 import { SlashCommandBuilder }  from 'discord.js';
 import ytdl from '@distube/ytdl-core';
 
@@ -53,14 +52,9 @@ export default {
                 guildId: interaction.guild.id,
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
-            const cookies = fs.readFileSync('./storage/cookies.txt', 'utf8');
-            
-            const agent = ytdl.createAgent(Array.from(JSON.parse(cookies)).map((cookie) => {
-                return {
-                    name: cookie.name,
-                    value: cookie.value
-                }
-            }))
+
+            const agent = ytdl.createProxyAgent({ uri: 'http://103.152.112.162:80' })
+
             const stream = ytdl(query, { 
                 filter: 'audioonly',
                 agent

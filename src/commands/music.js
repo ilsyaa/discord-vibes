@@ -1,6 +1,7 @@
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, AudioPlayerStatus } from '@discordjs/voice';
 import play from 'play-dl';
 import { SlashCommandBuilder }  from 'discord.js';
+import ytdl from '@distube/ytdl-core';
 
 export default {
     name: 'music',
@@ -23,6 +24,10 @@ export default {
 
         const query = interaction.options.getString('query');
 
+        if (!ytdl.validateURL(query)) {
+            return interaction.reply('pake link youtube bang');
+        }
+
         await interaction.deferReply();
 
         try {
@@ -43,26 +48,30 @@ export default {
                 console.log('Audio player sedang berhenti');
             });
 
-            const ytInfo = await play.search(query, { limit: 1 });
-            if (!ytInfo || ytInfo.length === 0) {
-                return interaction.editReply('Musik gak terkenal le, cari lain aja gak ada gw cari.');
-            }
-
             const connection = joinVoiceChannel({
                 channelId: interaction.member.voice.channel.id,
                 guildId: interaction.guild.id,
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
-            connection.subscribe(player);
 
-            const stream = await play.stream(ytInfo[0].url);
-            // const resource = createAudioResource('./cat.mp3')
-            const resource = createAudioResource(stream.stream, {
-                inputType: stream.type
+            const stream = ytdl(query, { filter: 'audioonly' });
+
+            console.log(stream);
+            
+
+            stream.on('error', (error) => {
+                console.error('stream YouTube:', error);
+                if (connection) {
+                    connection.destroy();
+                }
             });
+
+            connection.subscribe(player);   
+
+            const resource = createAudioResource(stream);
             player.play(resource);
 
-            await interaction.editReply(`Mulai memutar: ${ytInfo[0]?.title || 'lagu'}`);
+            await interaction.editReply(`Mulai memutar: lagu`);
         } catch (error) {
             console.error(error);
             await interaction.editReply('Waduh ada masalah le');

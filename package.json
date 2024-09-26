@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@discordjs/voice": "^0.17.0",
+    "@distube/ytdl-core": "^4.14.4",
     "@google/generative-ai": "^0.2.1",
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.5",
